@@ -69,7 +69,29 @@ Persistence Layer
     ├─ Database (JSONB structured storage)
     └─ Filesystem (artifacts + media)
 ```
+## Pipeline
 
+```mermaid
+flowchart TD
+    A[Video URL / Local Video]
+    B[VideoDownloader + Registry]
+    C[Normalization / Conversion]
+    D[Audio Extraction]
+    E[Frame Extraction]
+    F[Whisper Transcription]
+    G[Frame OCR]
+    H[NLP Enrichment\nSummary + Keywords + Title]
+    I[Metadata Assembly\nCategory + Thumbnail + SEO]
+    J[Persistence Layer\nFilesystem + DB / JSONB]
+    K[Searchable / Structured Video Record]
+
+    A --> B --> C
+    C --> D --> F
+    C --> E --> G
+    F --> H
+    G --> H
+    H --> I --> J --> K
+```
 ---
 
 ## 🔹 Core Capabilities
