@@ -1,4 +1,4 @@
-## Part of the Abstract Media Intelligence Platform
+## Part of the Abstract Intelligence Platform
 
 This module handles video ingestion and multimodal extraction within a unified media pipeline.
 
@@ -7,7 +7,7 @@ abstract_videos processes:
 - transcription (Whisper) + frame OCR
 - NLP enrichment and structured storage
 
-Full system: https://github.com/AbstractEndeavors/abstract-media-intelligence
+Full system: https://github.com/AbstractEndeavors/abstract-intelligence
 
 ## **abstract_videos — Video Processing & Media Intelligence Pipeline**
 
