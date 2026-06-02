@@ -31,6 +31,7 @@ __all__ = [
     "get_video_metadata",
     "get_video_seodata",
     "get_all",
+    "get_pipeline_data",
 ]
 
 
@@ -160,3 +161,48 @@ def get_all(**kwargs):
         return _build_pipeline(**kwargs).get_all()
     except Exception as e:
         return _error("get_all", e)
+
+
+# ── single-endpoint dispatch ────────────────────────────────────────────────
+#
+# The clownworld frontend calls one URL (/api/video/get_pipeline_data) and
+# selects the operation with a `key` field in the body. This maps each of those
+# key values (and a few aliases) onto the wrappers above so the frontend doesn't
+# need a route per operation. Unknown keys fall back to lightweight info.
+_DISPATCH = {
+    "info": "get_video_info",
+    "player": "get_video_info",
+    "extract": "get_video_info",
+    "raw": "get_video_info",
+    "url": "get_video_info",
+    "id": "get_video_info",
+    "path": "get_video_info",
+    "direct": "get_video_info",
+    "download": "get_video_download",
+    "download_video": "get_video_download",
+    "audio": "get_video_download",
+    "thumbnails": "get_video_thumbnails",
+    "whisper": "get_video_transcription",
+    "transcription": "get_video_transcription",
+    "captions": "get_video_transcription",
+    "metadata": "get_video_metadata",
+    "summary": "get_video_metadata",
+    "seo": "get_video_seodata",
+    "seodata": "get_video_seodata",
+    "metatags": "get_video_seodata",
+    "get_all": "get_all",
+    "all": "get_all",
+}
+
+
+def get_pipeline_data(key=None, **kwargs):
+    """Dispatch one request to the right endpoint based on ``key``.
+
+    Lets the frontend keep hitting a single URL with a ``key`` discriminator
+    instead of a route per operation. Returns the wrapper's result as-is.
+    """
+    try:
+        name = _DISPATCH.get((key or "info").strip().lower(), "get_video_info")
+        return globals()[name](**kwargs)
+    except Exception as e:
+        return _error("get_pipeline_data", e)
