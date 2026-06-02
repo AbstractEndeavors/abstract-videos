@@ -1,5 +1,4 @@
 from abstract_hugpy import *
-from .utilities import *
 
 def extract_keywords(text, top_n=10):
     try:

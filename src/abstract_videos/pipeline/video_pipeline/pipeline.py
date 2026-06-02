@@ -16,16 +16,17 @@ class VideoPipeline:
             self.video_url = get_corrected_url(self.video_url)
             self.video_id = get_video_id(self.video_url)
 
-        
-##        self.registry = infoRegistry(config=self.config)
-##
-##        self.info = self.registry.get_video_info(
-##            url=video_url,
-##            video_id=self.video_id,
-##            video_path=self.video_path,
-##            force_refresh=force_refresh
-##        ) or {}
-##        self.video_info = self.info.get('info') or {}
+        # Load any existing record so the ensure_*/compute helpers have a
+        # populated `info`/`video_info` to read paths from. Guarded so the
+        # pipeline still constructs when the registry/DB is unavailable.
+        self.info = {}
+        self.video_info = {}
+        try:
+            record = get_video_record(self.video_id) or {}
+            self.info = record
+            self.video_info = record.get('info') or {}
+        except Exception as e:
+            logger.warning(f"could not load video record for {self.video_id}: {e}")
 
     # ── internal plumbing ──────────────────────────────────────────────────
 
