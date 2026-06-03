@@ -40,6 +40,7 @@ __all__ = [
     "download_video",
     "download_videos",
     "get_video_info",
+    "check_dependencies",
     "SimpleVideoDownloader",
     "DownloadError",
 ]
@@ -47,6 +48,85 @@ __all__ = [
 
 class DownloadError(Exception):
     """Raised only when explicitly asked to (``raise_on_error=True``)."""
+
+
+# --------------------------------------------------------------------------- #
+# Dependency / environment checks
+# --------------------------------------------------------------------------- #
+def check_dependencies() -> Dict[str, Any]:
+    """Inspect the runtime environment for the tools this downloader needs.
+
+    Returns a report dict::
+
+        {
+            "ok": bool,                 # yt-dlp present (hard requirement)
+            "full_quality": bool,       # yt-dlp AND ffmpeg present
+            "yt_dlp": str | None,       # version or None
+            "ffmpeg": bool,
+            "ffprobe": bool,
+            "messages": [str, ...],     # human-readable status lines
+        }
+
+    ``yt-dlp`` is required to download anything. ``ffmpeg`` is optional but
+    needed to merge high-quality adaptive streams; without it the downloader
+    falls back to lower-quality progressive streams.
+    """
+    import shutil
+
+    report: Dict[str, Any] = {
+        "ok": False,
+        "full_quality": False,
+        "yt_dlp": None,
+        "ffmpeg": bool(shutil.which("ffmpeg")),
+        "ffprobe": bool(shutil.which("ffprobe")),
+        "messages": [],
+    }
+
+    try:
+        import yt_dlp
+        report["yt_dlp"] = getattr(yt_dlp.version, "__version__", "unknown")
+        report["ok"] = True
+        report["messages"].append(f"[ok] yt-dlp {report['yt_dlp']} installed")
+    except ImportError:
+        report["messages"].append(
+            "[MISSING] yt-dlp is required. Install it with: pip install yt-dlp"
+        )
+
+    if report["ffmpeg"] and report["ffprobe"]:
+        report["full_quality"] = report["ok"]
+        report["messages"].append("[ok] ffmpeg + ffprobe found")
+    else:
+        missing = ", ".join(
+            n for n, present in (("ffmpeg", report["ffmpeg"]), ("ffprobe", report["ffprobe"]))
+            if not present
+        )
+        report["messages"].append(
+            f"[WARNING] {missing} not found on PATH. High-quality merging is "
+            "disabled; downloads fall back to lower-quality progressive streams. "
+            "Install ffmpeg:\n"
+            "  Debian/Ubuntu : sudo apt install ffmpeg\n"
+            "  macOS (brew)  : brew install ffmpeg\n"
+            "  Windows       : winget install Gyan.FFmpeg"
+        )
+
+    return report
+
+
+def _print_doctor() -> int:
+    """Print the dependency report. Returns a process exit code."""
+    report = check_dependencies()
+    print("abstract_videos downloader — environment check")
+    print("-" * 48)
+    for line in report["messages"]:
+        print(line)
+    print("-" * 48)
+    if report["ok"] and report["full_quality"]:
+        print("Status: READY (full quality available)")
+    elif report["ok"]:
+        print("Status: USABLE (install ffmpeg for best quality)")
+    else:
+        print("Status: NOT READY (yt-dlp missing)")
+    return 0 if report["ok"] else 1
 
 
 # --------------------------------------------------------------------------- #
@@ -423,7 +503,11 @@ def _main(argv: Optional[List[str]] = None) -> int:
         prog="simple_downloader",
         description="Reliable, basic video downloader for any platform (yt-dlp).",
     )
-    parser.add_argument("urls", nargs="+", help="One or more video URLs.")
+    parser.add_argument("urls", nargs="*", help="One or more video URLs.")
+    parser.add_argument(
+        "--doctor", action="store_true",
+        help="Check that yt-dlp and ffmpeg are installed, then exit.",
+    )
     parser.add_argument("-o", "--output-dir", default=".", help="Destination directory.")
     parser.add_argument("-f", "--filename", default=None, help="Output filename (single URL).")
     parser.add_argument("--audio", action="store_true", help="Download audio only (mp3).")
@@ -439,6 +523,12 @@ def _main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--info", action="store_true", help="Print metadata, do not download.")
     parser.add_argument("--verbose", action="store_true", help="Show yt-dlp progress/output.")
     args = parser.parse_args(argv)
+
+    if args.doctor:
+        return _print_doctor()
+
+    if not args.urls:
+        parser.error("at least one URL is required (or use --doctor)")
 
     if args.info:
         import json

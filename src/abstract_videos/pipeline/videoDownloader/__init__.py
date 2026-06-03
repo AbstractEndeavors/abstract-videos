@@ -9,6 +9,7 @@ try:
         download_video as simple_download_video,
         download_videos as simple_download_videos,
         get_video_info as simple_get_video_info,
+        check_dependencies,
         DownloadError,
     )
 except Exception:  # pragma: no cover - defensive
