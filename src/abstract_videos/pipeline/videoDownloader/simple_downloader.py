@@ -50,13 +50,36 @@ class DownloadError(Exception):
 
 
 # --------------------------------------------------------------------------- #
+# ffmpeg detection
+# --------------------------------------------------------------------------- #
+def _has_ffmpeg() -> bool:
+    """True only if BOTH ffmpeg and ffprobe are on PATH.
+
+    yt-dlp needs ffmpeg to merge separate video+audio (adaptive) streams. When
+    it is missing, requesting ``bestvideo+bestaudio`` leaves you with only one
+    stream (commonly audio-only). Detecting this lets us fall back to a single
+    progressive stream that already contains both tracks.
+    """
+    import shutil
+    return bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))
+
+
+# --------------------------------------------------------------------------- #
 # Format selection
 # --------------------------------------------------------------------------- #
-def _default_format(audio_only: bool, quality: Optional[str]) -> str:
+def _default_format(
+    audio_only: bool,
+    quality: Optional[str],
+    can_merge: bool = True,
+) -> str:
     """Build a yt-dlp format string with graceful fallbacks.
 
     ``quality`` may be ``"best"`` (default), ``"worst"``, or a max height as a
     number/string like ``720`` to cap resolution on metered connections.
+
+    ``can_merge`` indicates whether ffmpeg is available. When it is ``False`` we
+    must pick a single *progressive* stream (video+audio in one file) because we
+    cannot merge separate adaptive streams — otherwise the result is audio-only.
     """
     if audio_only:
         return "bestaudio/best"
@@ -68,7 +91,19 @@ def _default_format(audio_only: bool, quality: Optional[str]) -> str:
             height = int(digits)
 
     if quality and str(quality).strip().lower() == "worst":
+        if not can_merge:
+            return "worst[vcodec!=none][acodec!=none]/worst"
         return "worstvideo+worstaudio/worst"
+
+    if not can_merge:
+        # No ffmpeg: only consider single files that already have BOTH streams.
+        if height:
+            return (
+                f"best[height<={height}][vcodec!=none][acodec!=none][ext=mp4]/"
+                f"best[height<={height}][vcodec!=none][acodec!=none]/"
+                f"best[height<={height}]/best"
+            )
+        return "best[vcodec!=none][acodec!=none][ext=mp4]/best[vcodec!=none][acodec!=none]/best"
 
     if height:
         # cap height, but always keep a fallback to a single progressive stream
@@ -93,9 +128,18 @@ def _build_ydl_opts(
     quiet: bool,
     extra: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
+    has_ffmpeg = _has_ffmpeg()
+    if not has_ffmpeg and not audio_only and not quiet:
+        print(
+            "[simple_downloader] WARNING: ffmpeg/ffprobe not found on PATH. "
+            "Falling back to a single progressive stream (lower max quality) so "
+            "you still get video+audio. Install ffmpeg for best quality.",
+            file=sys.stderr,
+        )
+
     opts: Dict[str, Any] = {
         "outtmpl": outtmpl,
-        "format": _default_format(audio_only, quality),
+        "format": _default_format(audio_only, quality, can_merge=has_ffmpeg),
         "paths": {"home": output_dir},
         # --- reliability ---
         "retries": retries,
@@ -119,14 +163,17 @@ def _build_ydl_opts(
     }
 
     if audio_only:
-        opts["postprocessors"] = [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }
-        ]
-    else:
+        if has_ffmpeg:
+            # Re-encode to mp3 only when ffmpeg is present; otherwise keep the
+            # native audio container so the download still succeeds.
+            opts["postprocessors"] = [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ]
+    elif has_ffmpeg:
         # Merge separate video+audio tracks into a single mp4 when ffmpeg exists.
         opts["merge_output_format"] = "mp4"
 
