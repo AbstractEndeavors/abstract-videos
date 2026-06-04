@@ -284,3 +284,25 @@ This system integrates directly with:
 * **Local-first, cloud-optional**
 
 ---
+
+## 🔹 Simple Video Downloader
+
+Alongside the full pipeline, `abstract_videos` ships a standalone, dependency-light
+**video downloader** that works across ~1,800 platforms (YouTube, Vimeo, TikTok,
+X, Instagram, Reddit, direct links, and more).
+
+```python
+from abstract_videos.pipeline.videoDownloader import simple_download_video
+
+result = simple_download_video("https://youtu.be/dQw4w9WgXcQ", output_dir="downloads")
+print(result["filepath"] if result["success"] else result["error"])
+```
+
+* **ffmpeg-aware** format selection — never silently returns an audio-only file
+* **layered retries** with exponential backoff
+* **returns a result dict**, never throws on normal failures
+* **environment doctor**: run `abstract-video-doctor` to verify `yt-dlp` / `ffmpeg`
+
+Full guide: [`src/abstract_videos/pipeline/videoDownloader/README.md`](src/abstract_videos/pipeline/videoDownloader/README.md)
+
+---
