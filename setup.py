@@ -23,8 +23,17 @@ setuptools.setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
     ],
-    install_requires=['abstract_utilities','requests','spacy'],
+    install_requires=['abstract_utilities','requests','spacy','yt-dlp'],
     python_requires=">=3.6",
+    entry_points={
+        "console_scripts": [
+            "abstract-video-dl=abstract_videos.pipeline.videoDownloader.simple_downloader:_main",
+            "abstract-video-doctor=abstract_videos.pipeline.videoDownloader.simple_downloader:_print_doctor",
+        ],
+    },
+    # Note: ffmpeg is an optional *system* dependency (not pip-installable).
+    # It is required only for merging high-quality adaptive streams. Run
+    # `abstract-video-doctor` to verify your environment.
     # Add this line to include wheel format in your distribution
     setup_requires=['wheel'],
 )
